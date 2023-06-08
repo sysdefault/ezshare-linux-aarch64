@@ -28,14 +28,15 @@ jobs:
         run: yarn
 
       - name: Build
-        run: npm run build
+        run: |
+          mv ezshare-frontend/src/App-arm64.js ezshare-frontend/src/App.js
+          npm run build
 
       - name: Patch
         run: patch -p1 < standalone.patch
 
       - name: Run pkg
         run: |
-          mv ezshare-frontend/src/App-arm64.js ezshare-frontend/src/App.js
           mkdir ezshare
           rm -r node_modules/clipboardy/fallbacks
           pkg . --targets=node16-linux-arm64 --output=ezshare/ezshare
