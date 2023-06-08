@@ -1,0 +1,227 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+
+import { Route } from 'react-router';
+import { Switch, useLocation, Link } from 'react-router-dom';
+import { FaFileArchive, FaFileDownload, FaFileAlt, FaFolder, FaFileUpload, FaShareAlt, FaRedoAlt } from 'react-icons/fa';
+import { useDropzone } from 'react-dropzone';
+import Swal from 'sweetalert2';
+
+import { CircularProgressbar } from 'react-circular-progressbar';
+import 'react-circular-progressbar/dist/styles.css';
+
+const Toast = Swal.mixin({
+  toast: true,
+  showConfirmButton: false,
+  timer: 3000,
+  position: 'top',
+})
+
+// A custom hook that builds on useLocation to parse
+// the query string for you.
+function useQuery() {
+  return new URLSearchParams(useLocation().search);
+}
+
+const colorLink = '#db6400';
+const colorLink2 = '#ffa62b';
+
+const boxBackgroundColor = '#fff';
+const iconColor = '#ffa62b'; // 'rgba(0,0,0,0.3)'
+
+const linkStyle = {
+  color: 'rgba(0,0,0,0.9)',
+  minWidth: 50,
+  textDecoration: 'none',
+  wordBreak: 'break-all',
+};
+
+const fileRowStyle = { borderTop: '1px solid #d1cebd', margin: '4px 0', padding: '4px 0 2px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
+
+const Section = ({ children, style }) => (
+  <div style={{ boxSizing: 'border-box', width: '100%', maxWidth: 600, marginLeft: 'auto', marginRight: 'auto', marginBottom: 50, padding: '20px 15px 25px 15px', borderRadius: 5, ...style }}>
+    {children}
+  </div>
+);
+
+const Uploader = ({ onUploadSuccess }) => {
+  const [uploadProgress, setUploadProgress] = useState();
+  const [uploadSpeed, setUploadSpeed] = useState();
+
+  const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
+    // console.log(acceptedFiles);
+
+    if (rejectedFiles && rejectedFiles.length > 0) {
+      Toast.fire({ icon: 'warning', title: 'Some file was not accepted' });
+    }
+
+    async function upload() {
+      let dataTotal;
+      let dataLoaded;
+      let startTime;
+
+      try {
+        // Toast.fire({ title: `${acceptedFiles.length} ${rejectedFiles.length}` });
+        setUploadProgress(0);
+        const data = new FormData();
+        acceptedFiles.forEach((file) => data.append('files', file));
+    
+        function onUploadProgress(progressEvent) {
+          dataTotal = progressEvent.total;
+          dataLoaded = progressEvent.loaded;
+          if (!startTime && dataLoaded) startTime = new Date().getTime();
+          setUploadProgress(dataLoaded / dataTotal);
+          if (dataLoaded && startTime) setUploadSpeed(dataLoaded / ((new Date().getTime() - startTime) / 1000));
+        }
+
+        await axios.post('/api/upload', data, { onUploadProgress });
+
+        Toast.fire({ icon: 'success', title: 'File(s) uploaded successfully' });
+        onUploadSuccess();
+      } catch (err) {
+        console.error('Upload failed', err);
+        const message = err.response?.data?.error?.message || err.message;
+        Toast.fire({ icon: 'error', title: `Upload failed: ${message}` });
+      } finally {
+        setUploadProgress();
+        setUploadSpeed();
+      }
+    }
+
+    upload();
+  }, [onUploadSuccess]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+  if (uploadProgress != null) {
+    const percentage = Math.round(uploadProgress * 100);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column' }}>
+      <div style={{ width: 100 }}>
+        <CircularProgressbar value={percentage} text={`${percentage}%`} />
+      </div>
+      {uploadSpeed && <div>{(uploadSpeed / 1e6).toFixed(2)}MB/s</div>}
+    </div>
+    );
+  }
+
+  return (
+    <div {...getRootProps()} style={{ outline: 'none',  background: boxBackgroundColor, cursor: 'pointer', padding: '30px 0', border: `3px dashed ${isDragActive ? 'rgba(255,0,0,0.4)' : 'rgba(0,0,0,0.1)'}`, borderRadius: 10, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+      <input {...getInputProps()} />
+
+      <FaFileUpload size={50} style={{ color: iconColor }} />
+
+      <div style={{ marginTop: 20, padding: '0 30px' }}>
+        {isDragActive ? '松开文件以上传' : '拖放单个/多个文件到这里 或 单击并选择要上传的文件'}
+      </div>
+    </div>
+  );
+}
+
+const getDownloadUrl = (path, forceDownload) => `/api/download?f=${encodeURIComponent(path)}&forceDownload=${forceDownload ? 'true' : 'false'}&_=${new Date().getTime()}`;
+
+const FileDownload = ({ url }) => <a style={{ textDecoration: 'none', marginLeft: 10, marginBottom: -5, color: colorLink }} href={url} title="下载文件"><FaFileDownload size={22} /></a>;
+const ZipDownload = ({ url }) => <a style={{ textDecoration: 'none', marginLeft: 10, marginBottom: -5, color: colorLink2 }} href={url} title="打包下载文件夹"><FaFileArchive size={22} /></a>;
+
+const FileRow = ({ path, isDir, fileName }) => {
+  const Icon = isDir ? FaFolder : FaFileAlt;
+
+  return (
+    <div key={`${path}_${fileName}`} style={fileRowStyle}>
+      <Icon size={16} style={{ color: 'rgba(0,0,0,0.5)', marginRight: 10 }} />
+      {isDir ? (
+        <>
+          <Link to={{ pathname: '/', search: `?p=${encodeURIComponent(path)}`}} style={linkStyle}>{fileName} {fileName === '..' && <span style={{ color: 'rgba(0,0,0,0.3)' }}>(返回上一层目录)</span>}</Link>
+          <div style={{ flexGrow: 1 }} />
+          <ZipDownload url={getDownloadUrl(path)} />
+        </>
+      ) : (
+        <>
+          <a style={linkStyle} target="_blank" rel="noopener noreferrer" href={getDownloadUrl(path)}>{fileName}</a>
+          <div style={{ flexGrow: 1 }} />
+          <FileDownload url={getDownloadUrl(path, true)} />
+        </>
+      )}
+    </div>
+  );
+};
+
+const Browser = () => {
+  const [currentDirFiles, setCurrentDirFiles] = useState({ files: [] });
+
+  const urlSearchParams = useQuery();
+  const rootPath = '/'
+  const currentPath = urlSearchParams.get('p') || rootPath;
+
+  const isInRootDir = currentPath === rootPath;
+
+  const loadCurrentPath = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/browse', { params: { p: currentPath} });
+      setCurrentDirFiles(response.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [currentPath]);
+
+  useEffect(() => {
+    loadCurrentPath();
+  }, [loadCurrentPath]);
+
+  function handleUploadSuccess() {
+    if (isInRootDir) loadCurrentPath();
+  }
+
+  function handleRefreshClick() {
+    loadCurrentPath();
+  }
+
+  const dirs = currentDirFiles.files.filter(f => f.isDir);
+  const nonDirs = currentDirFiles.files.filter(f => !f.isDir);
+
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Section>
+        <h2>上传文件</h2>
+        <Uploader onUploadSuccess={handleUploadSuccess} />
+      </Section>
+
+      <Section>
+        <h2>下载文件</h2>
+
+        <div style={{ wordBreak: 'break-all', padding: '0 5px 8px 5px', fontSize: '.85em', color: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <FaShareAlt size={10} style={{ marginRight: 10 }} />
+          {currentDirFiles.sharedPath}
+          <div style={{ flexGrow: 1 }} />
+          <FaRedoAlt size={12} role="button" style={{ color: colorLink, cursor: 'pointer', padding: '5px 1px 5px 5px' }} onClick={handleRefreshClick} />
+        </div>
+
+        <div style={{ ...fileRowStyle }}>
+          <div style={{ wordBreak: 'break-all', fontWeight: 500 }}>{currentDirFiles.curRelPath} <span style={{ color: 'rgba(0,0,0,0.3)' }}>(当前目录)</span></div>
+          <ZipDownload url={getDownloadUrl(currentDirFiles.curRelPath)} />
+        </div>
+
+        {dirs.map(FileRow)}
+        {nonDirs.map(FileRow)}
+      </Section>
+
+      {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+      <div style={{ textAlign: 'center', marginBottom: 50 }}><a href={'https://mifi.no'} style={{ textDecoration: 'none', fontWeight: '400', color: 'black' }}>More apps by mifi.no ❤️</a></div>
+    </div>
+  );
+};
+
+function App() {
+  return (
+    <div>
+      <Switch>
+        <Route path="/">
+          <Browser />
+        </Route>
+      </Switch>
+    </div>
+  );
+}
+
+export default App;
