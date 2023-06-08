@@ -194,7 +194,7 @@ const Browser = () => {
       data.append('saveAsFile', saveAsFile);
       await axios.post('/api/paste', data);
 
-      Toast.fire({ icon: 'success', title: saveAsFile ? 'Pasted text has been saved to a file on other side' : 'Pasted text has been sent to the clipboard on other side' });
+      Toast.fire({ icon: 'success', title: saveAsFile ? '粘贴的文本已保存到另一端的文件中' : '粘贴的文本已发送到另一端的剪贴板' });
     } catch (err) {
       console.error(err);
       Toast.fire({ icon: 'error', title: 'Paste clipboard failed' });
@@ -213,7 +213,7 @@ const Browser = () => {
   }
 
   function onClipboardCopySuccess() {
-    Toast.fire({ icon: 'success', title: 'Text has been copied from the other side\'s clipboard' });
+    Toast.fire({ icon: 'success', title: '已复制另一端的剪贴板文字' });
     setClipboardText();
   }
 
