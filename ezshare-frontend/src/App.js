@@ -220,7 +220,7 @@ const Browser = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-      <Section style={{ marginTop: 100 }}>
+      <Section>
         <h2>剪切板</h2>
 
         <div style={{ margin: 'auto', maxWidth: 350, width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', flexWrap: 'wrap' }}>
